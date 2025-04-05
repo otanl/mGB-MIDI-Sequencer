@@ -20,6 +20,13 @@ REM 仮想環境を有効化して依存パッケージをインストール
 echo 必要なパッケージをインストールしています...
 call venv\Scripts\activate
 python -m pip install -r requirements.txt
+if errorlevel 1 (
+    echo パッケージのインストールに失敗しました。
+    echo requirements.txtが正しいフォーマットであることを確認してください。
+    call venv\Scripts\deactivate.bat
+    pause
+    exit /b
+)
 
 echo mGB MIDI Sequencer を起動中...
 python wrapper.py

@@ -16,7 +16,12 @@ fi
 # 仮想環境を有効化して依存パッケージをインストール
 echo "必要なパッケージをインストールしています..."
 source venv/bin/activate
-python3 -m pip install -r requirements.txt
+if ! python3 -m pip install -r requirements.txt; then
+    echo "パッケージのインストールに失敗しました。"
+    echo "requirements.txtが正しいフォーマットであることを確認してください。"
+    deactivate
+    exit 1
+fi
 
 echo "mGB MIDI Sequencer を起動中..."
 python3 wrapper.py

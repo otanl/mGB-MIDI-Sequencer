@@ -1,4 +1,4 @@
-# MIDIƒV[ƒPƒ“ƒT[‚ÌˆË‘¶ŠÖŒW
+# MIDIã‚·ãƒ¼ã‚±ãƒ³ã‚µãƒ¼ã®ä¾å­˜é–¢ä¿‚
 mido>=1.2.10
 python-rtmidi>=1.4.9
 websockets>=10.3
