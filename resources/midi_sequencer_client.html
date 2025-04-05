@@ -1,0 +1,2548 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>mGB MIDIシーケンサーコントローラー</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 15px;
+            box-sizing: border-box;
+            overflow-x: hidden;
+            max-height: 100vh;
+        }
+        
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+        
+        .control-panel {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .step-button {
+            width: 38px;
+            height: 38px;
+            background-color: #BBDEFB;
+            border: 1px solid #ccc;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            position: relative;
+        }
+        
+        .step-button.active {
+            background-color: green;
+            color: white;
+        }
+        
+        .step-button.has-cc::after {
+            content: "CC";
+            position: absolute;
+            top: 1px;
+            right: 1px;
+            font-size: 6px;
+            background-color: #f90;
+            color: white;
+            padding: 1px;
+            border-radius: 2px;
+        }
+        /* ノート分割表示 */
+        
+        .step-button .note-divide {
+            position: absolute;
+            bottom: 1px;
+            right: 1px;
+            font-size: 7px;
+            padding: 1px;
+            border-radius: 2px;
+            background-color: #2196F3;
+            color: white;
+        }
+        
+        .step-button .divide-2 {
+            background-color: #FF9800;
+        }
+        
+        .step-button .divide-3 {
+            background-color: #9C27B0;
+        }
+        /* 連符設定に応じたボタン色 */
+        /* アクティブ（選択された）ステップのボタン色 */
+        
+        .step-button.active.divide-1 {
+            background-color: #1976D2 !important;
+            /* 1連符選択時：濃い青 */
+            color: white;
+        }
+        
+        .step-button.active.divide-2 {
+            background-color: #F57C00 !important;
+            /* 2連符選択時：濃いオレンジ */
+            color: white;
+        }
+        
+        .step-button.active.divide-3 {
+            background-color: #7B1FA2 !important;
+            /* 3連符選択時：濃い紫 */
+            color: white;
+        }
+        /* 非アクティブ（選択されていない）ステップのボタン色 */
+        
+        .step-button.divide-1:not(.active) {
+            background-color: #BBDEFB !important;
+            /* 1連符非選択時：薄い青 */
+            color: #444;
+        }
+        
+        .step-button.divide-2:not(.active) {
+            background-color: #FFE0B2 !important;
+            /* 2連符非選択時：薄いオレンジ */
+            color: #444;
+        }
+        
+        .step-button.divide-3:not(.active) {
+            background-color: #E1BEE7 !important;
+            /* 3連符非選択時：薄い紫 */
+            color: #444;
+        }
+        /* ノート分割設定用のスタイル */
+        
+        .divide-buttons {
+            position: absolute;
+            top: -16px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            gap: 3px;
+        }
+        
+        .divide-button {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 1px solid #ccc;
+            opacity: 0.6;
+        }
+        /* 非アクティブ状態の色 */
+        
+        .divide-button[data-divide="1"] {
+            background-color: #90CAF9 !important;
+            /* 薄い青 */
+            border-color: #64B5F6;
+        }
+        
+        .divide-button[data-divide="2"] {
+            background-color: #FFCC80 !important;
+            /* 薄いオレンジ */
+            border-color: #FFB74D;
+        }
+        
+        .divide-button[data-divide="3"] {
+            background-color: #CE93D8 !important;
+            /* 薄い紫 */
+            border-color: #BA68C8;
+        }
+        
+        .divide-button:hover {
+            transform: scale(1.1);
+            opacity: 0.8;
+        }
+        /* アクティブ状態の色 */
+        
+        .divide-button.active {
+            opacity: 1;
+        }
+        
+        .divide-button.active[data-divide="1"] {
+            background-color: #2196F3 !important;
+            /* 濃い青 */
+            border-color: #1976D2;
+        }
+        
+        .divide-button.active[data-divide="2"] {
+            background-color: #FF9800 !important;
+            /* 濃いオレンジ */
+            border-color: #F57C00;
+        }
+        
+        .divide-button.active[data-divide="3"] {
+            background-color: #9C27B0 !important;
+            /* 濃い紫 */
+            border-color: #7B1FA2;
+        }
+        /* ステップ間の区切りをわかりやすくするためのスタイル */
+        
+        .grid-row {
+            margin-top: 20px;
+            display: grid;
+            grid-template-columns: 70px repeat(16, 38px);
+            grid-gap: 10px;
+        }
+        /* ノブのスタイル */
+        
+        .mini-knob-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 50px;
+        }
+        
+        .mini-knob {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #666, #333);
+            position: relative;
+            cursor: grab;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.2);
+            margin-bottom: 3px;
+            border: 1px solid #555;
+        }
+        
+        .mini-knob:hover {
+            background: linear-gradient(135deg, #777, #444);
+        }
+        
+        .mini-knob:active {
+            cursor: grabbing;
+            background: linear-gradient(135deg, #888, #555);
+        }
+        
+        .mini-knob::after {
+            content: '';
+            position: absolute;
+            width: 3px;
+            height: 12px;
+            background-color: #fff;
+            top: 3px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-radius: 1.5px;
+        }
+        
+        .mini-knob-value {
+            font-size: 10px;
+            color: #ddd;
+            font-weight: bold;
+            text-shadow: 0 1px 1px rgba(0, 0, 0, 0.7);
+        }
+        /* ステップインジケーター行はマージンなし */
+        
+        .grid-row:first-child {
+            margin-top: 0;
+        }
+        
+        .grid-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        /* ノート単位の分割設定用 */
+        
+        .track-controls {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+        
+        .note-divide-select {
+            width: 50px;
+            font-size: 12px;
+        }
+        /* レスポンシブ対応 */
+        
+        @media (max-width: 1200px) {
+            .main-content {
+                flex-wrap: wrap;
+            }
+            .grid-section,
+            .cc-section {
+                flex: 1 1 100%;
+            }
+            .cc-controls {
+                display: flex;
+                flex-direction: row;
+                flex-wrap: wrap;
+                max-height: none;
+                overflow-y: visible;
+            }
+            .cc-track {
+                flex: 1 1 200px;
+            }
+        }
+        /* スマホ・タブレット対応 */
+        
+        @media (max-width: 768px) {
+            .upper-content {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+            }
+            .grid-section,
+            .note-knobs-section {
+                width: 100%;
+            }
+            body {
+                padding: 8px;
+            }
+            .control-panel {
+                gap: 4px;
+            }
+            .grid-row {
+                grid-template-columns: 60px repeat(16, 20px);
+                gap: 2px;
+                margin-bottom: 2px;
+            }
+            .step-button {
+                width: 20px;
+                height: 20px;
+                font-size: 8px;
+            }
+            .step-indicator {
+                width: 20px;
+                height: 16px;
+                font-size: 10px;
+            }
+        }
+        /* 追加のスタイル */
+        
+        .settings-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin: 10px 0;
+        }
+        
+        .setting-item {
+            display: flex;
+            flex-direction: column;
+            min-width: 100px;
+        }
+        
+        .checkbox-container {
+            flex-direction: row;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        #status {
+            margin-top: 10px;
+            color: #666;
+            font-style: italic;
+        }
+        /* コントロールパネルのスタイル */
+        
+        .control-item {
+            display: flex;
+            align-items: center;
+            margin-right: 5px;
+        }
+        
+        .control-button {
+            padding: 8px 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .control-button:hover {
+            background-color: #45a049;
+        }
+        
+        .control-button:active {
+            background-color: #3e8e41;
+        }
+        /* レイアウト構造のスタイル */
+        
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .upper-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5px;
+        }
+        
+        .grid-section {
+            width: 100%;
+        }
+        
+        .note-knobs-section {
+            width: 100%;
+            min-width: 0;
+            max-width: none;
+            overflow-y: visible;
+            max-height: none;
+            border: none;
+            padding: 0;
+        }
+        
+        .note-knobs-container {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .cc-section {
+            width: 100%;
+            border-top: 1px solid #eee;
+            padding-top: 5px;
+            max-height: 45vh;
+            overflow-y: auto;
+        }
+        /* ステップインジケーター */
+        
+        .step-indicator {
+            width: 38px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #f5f5f5;
+            border: 1px solid #ccc;
+            font-size: 12px;
+        }
+        
+        .step-indicator.current {
+            background-color: #ff5722;
+            color: white;
+            border-color: #e64a19;
+        }
+        /* モーダルスタイル */
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.4);
+        }
+        
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 500px;
+            border-radius: 5px;
+        }
+        
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .note-input {
+            margin: 20px 0;
+        }
+        
+        .note-slider {
+            width: 100%;
+        }
+        
+        #pianoKeys {
+            display: flex;
+            overflow-x: auto;
+            margin: 10px 0;
+            padding: 5px;
+            height: 60px;
+        }
+        
+        .note-divide-setting {
+            margin: 10px 0;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        /* 接続状態表示 */
+        
+        .connection-status {
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            display: inline-block;
+        }
+        
+        .connected {
+            background-color: #4CAF50;
+            color: white;
+        }
+        
+        .disconnected {
+            background-color: #f44336;
+            color: white;
+        }
+        /* ステップ間の区切りをわかりやすくするためのスタイル */
+        /* CCセクションのスタイル */
+        
+        .cc-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            max-width: 100%;
+        }
+        
+        .cc-track {
+            border: 1px solid #ccc;
+            padding: 4px;
+            border-radius: 5px;
+            flex: 1 1 225px;
+            max-width: calc(25% - 10px);
+        }
+        
+        .cc-track h3 {
+            margin-top: 0;
+            margin-bottom: 3px;
+            font-size: 12px;
+        }
+        
+        .cc-slider {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            margin-bottom: 3px;
+        }
+        
+        .cc-slider label {
+            width: 75px;
+            font-size: 10px;
+        }
+        /* ノブ関連のスタイル */
+        
+        .knob-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .knob {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: #444;
+            position: relative;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            margin-bottom: 5px;
+        }
+        
+        .knob::after {
+            content: '';
+            position: absolute;
+            width: 4px;
+            height: 16px;
+            background-color: #fff;
+            top: 4px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-radius: 2px;
+        }
+        
+        .knob-value {
+            font-size: 12px;
+            color: #ccc;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>mGB MIDIシーケンサーコントローラー</h1>
+
+    <div class="connection-status disconnected" id="connectionStatus">切断</div>
+
+    <div class="container">
+        <div class="control-panel">
+            <button id="play-button" class="control-button">再生</button>
+
+            <!-- BPM設定 -->
+            <div class="control-item">
+                <label for="bpm-input">BPM:</label>
+                <input type="number" id="bpm-input" min="20" max="300" value="120">
+            </div>
+
+            <!-- MIDIポート設定 -->
+            <div class="control-item">
+                <label for="midi-output-select">MIDI出力:</label>
+                <select id="midi-output-select"></select>
+            </div>
+
+            <div class="control-item">
+                <label for="midi-input-select">MIDI入力:</label>
+                <select id="midi-input-select"></select>
+            </div>
+
+            <div class="control-item">
+                <label>
+                    <input type="checkbox" id="midi-clock-checkbox">
+                    MIDI Clock同期
+                </label>
+            </div>
+
+            <button id="send-preset-1" class="preset-button">プリセット1</button>
+            <button id="send-preset-2" class="preset-button">プリセット2</button>
+        </div>
+
+        <div class="control-panel">
+            <label>プリセット:</label>
+            <div id="presetButtons">
+                <button data-preset="1">1</button>
+                <button data-preset="2">2</button>
+                <button data-preset="3">3</button>
+                <button data-preset="4">4</button>
+                <button data-preset="5">5</button>
+            </div>
+
+            <div style="margin-left: 20px;">
+                <label>ランダマイズ:</label>
+                <button onclick="sendBatchUpdate('sequence_all')">ステップ</button>
+                <button onclick="sendBatchUpdate('note_all')">ノート</button>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="upper-content">
+                <div class="grid-section">
+                    <div class="sequencer-grid" id="sequencerGrid">
+                        <!-- JavaScriptで動的に生成 -->
+                    </div>
+                </div>
+
+                <div class="note-knobs-section" id="noteKnobsSection">
+                    <!-- JavaScriptで動的に生成 -->
+                </div>
+            </div>
+
+            <div class="cc-section">
+                <div class="cc-controls" id="ccControls">
+                    <!-- JavaScriptで動的に生成 -->
+                </div>
+            </div>
+        </div>
+
+        <div class="status" id="status">
+            ステータス: 準備完了
+        </div>
+    </div>
+
+    <!-- ノート設定用モーダルダイアログ -->
+    <div id="noteModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">ノート設定</h2>
+                <span class="close">&times;</span>
+            </div>
+            <div class="note-input">
+                <input type="range" id="noteSlider" class="note-slider" min="36" max="96" value="60">
+                <div class="note-display">
+                    <span id="noteValue">C4 (60)</span>
+                </div>
+                <div id="pianoKeys"></div>
+                <div class="note-divide-setting">
+                    <label for="noteDivideSelect">分割設定:</label>
+                    <select id="noteDivideSelect">
+                        <option value="1">1 (通常)</option>
+                        <option value="2">2連符</option>
+                        <option value="3">3連符</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-buttons">
+                <button id="cancelButton">キャンセル</button>
+                <button id="saveButton">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // WebSocket接続
+        const wsUrl = 'ws://192.168.2.101:8765';
+        let socket;
+        let reconnectInterval = null;
+        let modalData = {
+            row: null,
+            col: null,
+            note: null,
+            divide: null
+        };
+        let currentState = {
+            sequence: [],
+            note_values: [],
+            note_divides: [], // 各ノートごとの分割設定
+            cc_values: {},
+            current_step: 0,
+            is_playing: false,
+            bpm: 120
+        };
+
+        // ローカル操作中フラグ - リアルタイム更新競合防止用
+        let isLocallyControlling = {
+            step: false,
+            note: false,
+            cc: false,
+            divide: false
+        };
+
+        // 接続リトライ用の変数
+        let connectionAttempts = 0;
+        const maxConnectionAttempts = 5;
+        let isConnecting = false;
+        let clientId = Date.now().toString() + Math.random().toString(36).substring(2, 9);
+
+        const connectionStatus = document.getElementById('connectionStatus');
+        const playButton = document.getElementById('play-button');
+        const bpmInput = document.getElementById('bpm-input');
+        const sequencerGrid = document.getElementById('sequencerGrid');
+        const ccControls = document.getElementById('ccControls');
+        const midiOutput = document.getElementById('midi-output-select');
+        const midiInput = document.getElementById('midi-input-select');
+        const midiClock = document.getElementById('midi-clock-checkbox');
+        const refreshButton = document.getElementById('refreshButton');
+        const statusElement = document.getElementById('status');
+        const presetButtons = document.getElementById('presetButtons').querySelectorAll('button');
+
+        // モーダル要素
+        const noteModal = document.getElementById('noteModal');
+        const noteSlider = document.getElementById('noteSlider');
+        const noteValue = document.getElementById('noteValue');
+        const noteDivideSelect = document.getElementById('noteDivideSelect');
+        const saveButton = document.getElementById('saveButton');
+        const cancelButton = document.getElementById('cancelButton');
+        const closeButton = document.querySelector('.close');
+        const pianoKeys = document.getElementById('pianoKeys');
+
+        // 音符名の取得関数
+        function getNoteName(noteNumber) {
+            const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+            const octave = Math.floor(noteNumber / 12) - 1;
+            const noteName = notes[noteNumber % 12];
+            return `${noteName}${octave} (${noteNumber})`;
+        }
+
+        // ピアノキーの描画
+        function renderPianoKeys() {
+            pianoKeys.innerHTML = '';
+
+            for (let i = parseInt(noteSlider.min); i <= parseInt(noteSlider.max); i++) {
+                const isBlack = [1, 3, 6, 8, 10].includes(i % 12);
+                const key = document.createElement('div');
+                key.style.width = isBlack ? '12px' : '20px';
+                key.style.height = isBlack ? '30px' : '50px';
+                key.style.backgroundColor = isBlack ? 'black' : 'white';
+                key.style.border = '1px solid black';
+                key.style.flexShrink = '0';
+                key.style.position = 'relative';
+                key.style.cursor = 'pointer';
+
+                if (i === parseInt(noteSlider.value)) {
+                    key.style.backgroundColor = 'orange';
+                }
+
+                if (!isBlack && i % 12 === 0) {
+                    const label = document.createElement('div');
+                    label.style.position = 'absolute';
+                    label.style.bottom = '5px';
+                    label.style.width = '100%';
+                    label.style.textAlign = 'center';
+                    label.style.fontSize = '10px';
+                    label.textContent = `C${Math.floor(i / 12) - 1}`;
+                    key.appendChild(label);
+                }
+
+                key.addEventListener('click', () => {
+                    noteSlider.value = i;
+                    updateNoteDisplay();
+                    renderPianoKeys();
+                });
+
+                pianoKeys.appendChild(key);
+            }
+        }
+
+        // ノート表示の更新
+        function updateNoteDisplay() {
+            const value = noteSlider.value;
+            noteValue.textContent = getNoteName(parseInt(value));
+        }
+
+        // モーダルのイベントリスナー
+        noteSlider.addEventListener('input', () => {
+            updateNoteDisplay();
+            renderPianoKeys();
+        });
+
+        closeButton.addEventListener('click', () => {
+            noteModal.style.display = 'none';
+        });
+
+        cancelButton.addEventListener('click', () => {
+            noteModal.style.display = 'none';
+        });
+
+        saveButton.addEventListener('click', () => {
+            if (modalData.row !== null && modalData.col !== null) {
+                const noteVal = parseInt(noteSlider.value);
+                const divideVal = parseInt(noteDivideSelect.value);
+                updateNote(modalData.row, modalData.col, noteVal, divideVal);
+                noteModal.style.display = 'none';
+            }
+        });
+
+        // シーケンサーグリッドの描画
+        function renderSequencerGrid() {
+            console.log('シーケンサーグリッドを描画中...');
+            sequencerGrid.innerHTML = '';
+            const noteKnobsSection = document.getElementById('noteKnobsSection');
+            noteKnobsSection.innerHTML = '';
+
+            // コンテナ要素の作成
+            const gridContainer = document.createElement('div');
+            gridContainer.classList.add('grid-container');
+
+            console.log('現在のステップ:', currentState.current_step);
+
+            // ステップインジケーター行を追加
+            const indicatorRow = document.createElement('div');
+            indicatorRow.classList.add('grid-row');
+
+            const headerLabel = document.createElement('div');
+            headerLabel.textContent = 'ステップ:';
+            headerLabel.classList.add('track-label');
+            indicatorRow.appendChild(headerLabel);
+
+            for (let i = 0; i < 16; i++) {
+                const indicator = document.createElement('div');
+                indicator.classList.add('step-indicator');
+                indicator.textContent = i + 1;
+                indicator.dataset.step = i; // データ属性を追加
+
+                // 現在のステップをハイライト
+                if (i === currentState.current_step) {
+                    console.log(`現在のステップ ${i} をハイライト`);
+                    indicator.classList.add('current');
+                }
+
+                indicatorRow.appendChild(indicator);
+            }
+
+            gridContainer.appendChild(indicatorRow);
+
+            // シーケンスボタン行を追加
+            if (currentState.sequence && currentState.sequence.length > 0) {
+                console.log(`シーケンス行数: ${currentState.sequence.length}`);
+                for (let row = 0; row < currentState.sequence.length; row++) {
+                    // トラック行要素
+                    const rowElement = document.createElement('div');
+                    rowElement.classList.add('grid-row');
+                    rowElement.dataset.row = row;
+
+                    // トラックラベル
+                    const trackLabel = document.createElement('div');
+                    trackLabel.textContent = `トラック ${row + 1}`;
+                    trackLabel.classList.add('track-label');
+                    trackLabel.style.width = '70px';
+                    rowElement.appendChild(trackLabel);
+
+                    for (let col = 0; col < currentState.sequence[row].length; col++) {
+                        const button = document.createElement('div');
+                        button.classList.add('step-button');
+                        button.dataset.row = row;
+                        button.dataset.col = col;
+
+                        // アクティブな状態を設定
+                        if (currentState.sequence[row][col]) {
+                            button.classList.add('active');
+                        }
+
+                        // 分割設定に応じたクラスを追加
+                        let divideValue = 1; // デフォルト値
+                        if (currentState.note_divides &&
+                            currentState.note_divides[row] &&
+                            currentState.note_divides[row][col] !== undefined) {
+                            divideValue = currentState.note_divides[row][col];
+                        }
+                        button.classList.add(`divide-${divideValue}`);
+
+                        // ノート値を表示
+                        if (currentState.note_values && currentState.note_values[row] && currentState.note_values[row][col] !== undefined) {
+                            const noteNumber = currentState.note_values[row][col];
+                            const noteName = getNoteName(noteNumber).split(' ')[0]; // C4 のような形式だけ取得
+                            button.textContent = noteName;
+                        }
+
+                        // 分割設定ボタンを追加
+                        const divideButtons = document.createElement('div');
+                        divideButtons.classList.add('divide-buttons');
+
+                        // 1連符、2連符、3連符のボタンを作成
+                        for (let d = 1; d <= 3; d++) {
+                            const divButton = document.createElement('div');
+                            divButton.classList.add('divide-button');
+                            divButton.dataset.divide = d; // data-divide属性を設定
+
+                            // 分割設定クラスを追加
+                            divButton.classList.add(`divide-${d}`);
+
+                            // 現在の分割値と一致する場合はアクティブに
+                            if (divideValue === d) {
+                                divButton.classList.add('active');
+                            }
+
+                            // 分割設定を切り替えるイベントリスナー
+                            divButton.addEventListener('click', (e) => {
+                                e.stopPropagation(); // 親要素へのイベント伝播を停止
+
+                                // 既に同じ値の場合はデフォルト(1)に戻す
+                                const newDivide = (divideValue === d) ? 1 : d;
+
+                                // 分割値を更新してサーバーに送信
+                                updateNote(row, col,
+                                    currentState.note_values[row][col],
+                                    newDivide);
+                            });
+
+                            divideButtons.appendChild(divButton);
+                        }
+
+                        button.appendChild(divideButtons);
+
+                        // クリックでステップを切り替え
+                        button.addEventListener('click', (e) => {
+                            // 通常クリックでステップのオン/オフを切り替え
+                            const newState = !currentState.sequence[row][col];
+                            toggleStep(row, col, newState);
+                        });
+
+                        // Shift+クリックでノート設定モーダルを表示
+                        button.addEventListener('mousedown', (e) => {
+                            if (e.shiftKey) {
+                                e.preventDefault();
+
+                                // 現在のノート値を取得
+                                let currentNote = 60; // デフォルト値
+                                if (currentState.note_values && currentState.note_values[row] && currentState.note_values[row][col] !== undefined) {
+                                    currentNote = currentState.note_values[row][col];
+                                }
+
+                                // 現在の分割設定を取得
+                                let currentDivide = "1"; // デフォルト値
+                                if (currentState.note_divides && currentState.note_divides[row] &&
+                                    currentState.note_divides[row][col] !== undefined) {
+                                    currentDivide = currentState.note_divides[row][col].toString();
+                                }
+
+                                // モーダルデータを設定
+                                modalData = {
+                                    row: row,
+                                    col: col,
+                                    note: currentNote,
+                                    divide: currentDivide
+                                };
+
+                                // モーダルのタイトルを設定
+                                document.getElementById('modalTitle').textContent = `ノート設定 - トラック ${row + 1}, ステップ ${col + 1}`;
+
+                                // スライダーの値を設定
+                                noteSlider.value = currentNote;
+                                updateNoteDisplay();
+                                renderPianoKeys();
+
+                                // 分割設定を設定
+                                noteDivideSelect.value = currentDivide;
+
+                                // モーダルを表示
+                                noteModal.style.display = 'block';
+                            }
+                        });
+
+                        rowElement.appendChild(button);
+                    }
+
+                    gridContainer.appendChild(rowElement);
+                }
+
+                // グリッドを追加した後でステップインジケーターを更新
+                sequencerGrid.appendChild(gridContainer);
+
+                // ノートノブセクションの描画
+                renderNoteKnobs(noteKnobsSection);
+
+                console.log('グリッド描画完了、ステップインジケーター更新');
+                updateStepIndicators(currentState.current_step);
+                return;
+            }
+
+            sequencerGrid.appendChild(gridContainer);
+        }
+
+        // ノートノブセクションの描画
+        function renderNoteKnobs(container) {
+            if (!container) return;
+
+            // 各行のノート値に対応するノブを作成
+            if (currentState.note_values && currentState.note_values.length > 0) {
+                for (let row = 0; row < currentState.note_values.length; row++) {
+                    // ノブ行のコンテナ
+                    const knobRow = document.createElement('div');
+                    knobRow.classList.add('note-knob-row');
+                    knobRow.style.display = 'grid';
+                    knobRow.style.gridTemplateColumns = '70px repeat(16, 38px)';
+                    knobRow.style.gap = '4px';
+                    knobRow.style.marginBottom = '4px';
+                    knobRow.dataset.row = row;
+
+                    // トラックラベル
+                    const trackLabel = document.createElement('div');
+                    trackLabel.textContent = `ノート ${row + 1}`;
+                    trackLabel.classList.add('track-label');
+                    knobRow.appendChild(trackLabel);
+
+                    // 各ステップのノブ
+                    for (let col = 0; col < currentState.note_values[row].length; col++) {
+                        const knobContainer = document.createElement('div');
+                        knobContainer.classList.add('mini-knob-container');
+
+                        const knob = document.createElement('div');
+                        knob.classList.add('mini-knob');
+                        knob.dataset.row = row;
+                        knob.dataset.col = col;
+
+                        // 値表示
+                        const valueDisplay = document.createElement('div');
+                        valueDisplay.classList.add('mini-knob-value');
+                        const noteNumber = currentState.note_values[row][col];
+                        const noteName = getNoteName(noteNumber).split(' ')[0]; // C4 のような形式だけ取得
+                        valueDisplay.textContent = noteName;
+
+                        // ノート値に応じた角度を設定
+                        const normalizedValue = (noteNumber - 36) / 60; // 36-96の範囲を0-1にマッピング
+                        const rotation = normalizedValue * 270 - 135; // -135°から+135°の範囲
+                        knob.style.transform = `rotate(${rotation}deg)`;
+
+                        // ドラッグ操作のための変数
+                        let isDragging = false;
+                        let startY;
+                        let startValue;
+
+                        // マウスダウン (ドラッグ開始)
+                        knob.addEventListener('mousedown', (e) => {
+                            // シフトキーを押していたらモーダルを表示
+                            if (e.shiftKey) {
+                                e.preventDefault();
+
+                                // モーダルデータを設定
+                                modalData = {
+                                    row: row,
+                                    col: col,
+                                    note: currentState.note_values[row][col]
+                                };
+
+                                // モーダルのタイトルを設定
+                                document.getElementById('modalTitle').textContent = `ノート設定 - トラック ${row + 1}, ステップ ${col + 1}`;
+
+                                // スライダーの値を設定
+                                noteSlider.value = currentState.note_values[row][col];
+                                updateNoteDisplay();
+                                renderPianoKeys();
+
+                                // モーダルを表示
+                                noteModal.style.display = 'block';
+                                return;
+                            }
+
+                            // 通常のドラッグ開始
+                            isDragging = true;
+                            startY = e.clientY;
+                            startValue = currentState.note_values[row][col];
+                            knob.style.cursor = 'grabbing';
+                            e.preventDefault();
+                        });
+
+                        // マウスムーブ (ドラッグ中)
+                        document.addEventListener('mousemove', (e) => {
+                            if (!isDragging) return;
+
+                            // Y座標の変化に基づいて値を変更（上に移動するほど値が大きくなる）
+                            const deltaY = startY - e.clientY;
+                            let newNote = Math.max(36, Math.min(96, startValue + Math.round(deltaY / 3)));
+
+                            // 値と表示を更新
+                            currentState.note_values[row][col] = newNote;
+                            const newNoteName = getNoteName(newNote).split(' ')[0];
+                            valueDisplay.textContent = newNoteName;
+
+                            // ノブの回転を更新
+                            const normalizedNewValue = (newNote - 36) / 60;
+                            const newRotation = normalizedNewValue * 270 - 135;
+                            knob.style.transform = `rotate(${newRotation}deg)`;
+
+                            // ノート値をサーバーに送信
+                            sendMessage({
+                                command: 'set_note',
+                                row: row,
+                                col: col,
+                                note: newNote
+                            });
+                        });
+
+                        // マウスアップ (ドラッグ終了)
+                        document.addEventListener('mouseup', () => {
+                            if (!isDragging) return;
+                            isDragging = false;
+                            knob.style.cursor = 'pointer';
+                        });
+
+                        // タッチデバイス対応
+                        knob.addEventListener('touchstart', (e) => {
+                            isDragging = true;
+                            startY = e.touches[0].clientY;
+                            startValue = currentState.note_values[row][col];
+                            e.preventDefault();
+                        });
+
+                        document.addEventListener('touchmove', (e) => {
+                            if (!isDragging) return;
+
+                            const deltaY = startY - e.touches[0].clientY;
+                            let newNote = Math.max(36, Math.min(96, startValue + Math.round(deltaY / 3)));
+
+                            currentState.note_values[row][col] = newNote;
+                            const newNoteName = getNoteName(newNote).split(' ')[0];
+                            valueDisplay.textContent = newNoteName;
+
+                            const normalizedNewValue = (newNote - 36) / 60;
+                            const newRotation = normalizedNewValue * 270 - 135;
+                            knob.style.transform = `rotate(${newRotation}deg)`;
+
+                            sendMessage({
+                                command: 'set_note',
+                                row: row,
+                                col: col,
+                                note: newNote
+                            });
+                        });
+
+                        document.addEventListener('touchend', () => {
+                            if (!isDragging) return;
+                            isDragging = false;
+                        });
+
+                        knobContainer.appendChild(knob);
+                        knobContainer.appendChild(valueDisplay);
+                        knobRow.appendChild(knobContainer);
+                    }
+
+                    container.appendChild(knobRow);
+                }
+            }
+        }
+
+        // CCパラメータ名を取得する関数
+        function getCCParameterName(track, cc) {
+            const ccNames = {
+                "cc1": {
+                    "PU1": "Pulse Width",
+                    "PU2": "Pulse Width",
+                    "WAV": "Shape",
+                    "NOISE": "Shape",
+                    "POLY": "Pulse Width"
+                },
+                "cc2": {
+                    "PU1": "Envelope",
+                    "PU2": "Envelope",
+                    "WAV": "Offset",
+                    "NOISE": "Envelope",
+                    "POLY": "Envelope"
+                },
+                "cc3": {
+                    "PU1": "Pitch Sweep",
+                    "PU2": "Pitch Sweep",
+                    "WAV": "Pitch Sweep",
+                    "NOISE": "Pitch Sweep",
+                    "POLY": "Pitch Sweep"
+                },
+                "cc4": {
+                    "PU1": "PB Range",
+                    "PU2": "PB Range",
+                    "WAV": "PB Range",
+                    "NOISE": "PB Range",
+                    "POLY": "PB Range"
+                },
+                "cc10": {
+                    "PU1": "Pan",
+                    "PU2": "Pan",
+                    "WAV": "Pan",
+                    "NOISE": "Pan",
+                    "POLY": "Pan"
+                },
+                "cc64": {
+                    "PU1": "Sustain",
+                    "PU2": "Sustain",
+                    "WAV": "Sustain",
+                    "NOISE": "Sustain",
+                    "POLY": "Sustain"
+                }
+            };
+
+            if (ccNames[cc] && ccNames[cc][track]) {
+                return ccNames[cc][track];
+            }
+
+            return cc; // デフォルトはCC番号をそのまま返す
+        }
+
+        // CCコントロールの描画
+        function renderCCControls() {
+            ccControls.innerHTML = '';
+
+            if (currentState.cc_values) {
+                for (const track in currentState.cc_values) {
+                    const trackDiv = document.createElement('div');
+                    trackDiv.classList.add('cc-track');
+                    trackDiv.innerHTML = `<h3>${track}</h3>`;
+
+                    const ccValues = currentState.cc_values[track];
+                    for (const cc in ccValues) {
+                        const controlContainer = document.createElement('div');
+                        controlContainer.classList.add('cc-slider');
+
+                        // CCの名前を取得
+                        const ccName = getCCParameterName(track, cc);
+
+                        const label = document.createElement('label');
+                        label.textContent = `${ccName} (${cc})`;
+
+                        // サステイン (cc64) の場合はトグルボタンを作成
+                        if (cc === "cc64") {
+                            const buttonContainer = document.createElement('div');
+                            buttonContainer.style.display = 'flex';
+                            buttonContainer.style.gap = '5px';
+
+                            const value = ccValues[cc];
+
+                            const onButton = document.createElement('button');
+                            onButton.textContent = 'ON';
+                            onButton.style.width = '50px';
+                            onButton.style.backgroundColor = value >= 64 ? '#4CAF50' : '#f0f0f0';
+                            onButton.style.color = value >= 64 ? 'white' : 'black';
+                            onButton.style.border = value >= 64 ? '1px solid #4CAF50' : '1px solid #ccc';
+                            onButton.style.borderRadius = '4px';
+                            onButton.style.padding = '5px';
+                            onButton.style.cursor = 'pointer';
+
+                            const offButton = document.createElement('button');
+                            offButton.textContent = 'OFF';
+                            offButton.style.width = '50px';
+                            offButton.style.backgroundColor = value < 64 ? '#f44336' : '#f0f0f0';
+                            offButton.style.color = value < 64 ? 'white' : 'black';
+                            offButton.style.border = value < 64 ? '1px solid #f44336' : '1px solid #ccc';
+                            offButton.style.borderRadius = '4px';
+                            offButton.style.padding = '5px';
+                            offButton.style.cursor = 'pointer';
+
+                            onButton.addEventListener('click', () => {
+                                // サステインをオンにする (値 = 127)
+                                currentState.cc_values[track][cc] = 127;
+                                sendCCUpdate(track, cc, 127);
+                                renderCCControls(); // ボタンの状態を更新
+                            });
+
+                            offButton.addEventListener('click', () => {
+                                // サステインをオフにする (値 = 0)
+                                currentState.cc_values[track][cc] = 0;
+                                sendCCUpdate(track, cc, 0);
+                                renderCCControls(); // ボタンの状態を更新
+                            });
+
+                            buttonContainer.appendChild(onButton);
+                            buttonContainer.appendChild(offButton);
+
+                            controlContainer.appendChild(label);
+                            controlContainer.appendChild(buttonContainer);
+                        } else {
+                            // 通常のパラメータはノブを使用
+                            // ノブコンテナの作成
+                            const knobContainer = document.createElement('div');
+                            knobContainer.classList.add('knob-container');
+
+                            // ノブ要素の作成
+                            const knob = document.createElement('div');
+                            knob.classList.add('knob');
+
+                            // 値表示用の要素
+                            const valueDisplay = document.createElement('div');
+                            valueDisplay.classList.add('knob-value');
+                            valueDisplay.textContent = ccValues[cc];
+
+                            // 現在の値と角度を設定
+                            const value = ccValues[cc];
+                            const rotation = (value / 127) * 270 - 135; // -135°から+135°の範囲
+                            knob.style.transform = `rotate(${rotation}deg)`;
+
+                            // ノブのドラッグ操作のための変数
+                            let isDragging = false;
+                            let startY;
+                            let startValue = value;
+                            let lastSentValue = value;
+                            let lastSentTime = 0;
+                            let sendTimeoutId = null;
+                            const throttleDelay = 50; // 50ms間隔でのみ送信
+
+                            // マウスダウン (ドラッグ開始)
+                            knob.addEventListener('mousedown', (e) => {
+                                isDragging = true;
+                                startY = e.clientY;
+                                startValue = parseInt(valueDisplay.textContent);
+                                knob.style.cursor = 'grabbing';
+                                e.preventDefault();
+                            });
+
+                            // マウスムーブ (ドラッグ中)
+                            document.addEventListener('mousemove', (e) => {
+                                if (!isDragging) return;
+
+                                // 垂直方向の移動量に基づいて値を変更
+                                const deltaY = startY - e.clientY;
+                                let newValue = Math.max(0, Math.min(127, startValue + Math.round(deltaY / 2)));
+
+                                // 値と表示を更新
+                                valueDisplay.textContent = newValue;
+
+                                // ノブの回転を更新
+                                const rotation = (newValue / 127) * 270 - 135;
+                                knob.style.transform = `rotate(${rotation}deg)`;
+
+                                // 値の更新
+                                currentState.cc_values[track][cc] = newValue;
+
+                                // 前回の送信から一定時間経過しているか、値に大きな変化があれば送信
+                                const now = Date.now();
+                                const valueChange = Math.abs(newValue - lastSentValue);
+
+                                // 送信予約をクリア
+                                if (sendTimeoutId) {
+                                    clearTimeout(sendTimeoutId);
+                                }
+
+                                // 条件に一致したら即時送信
+                                if (now - lastSentTime > throttleDelay || valueChange > 5) {
+                                    sendCCUpdate(track, cc, newValue);
+                                    lastSentValue = newValue;
+                                    lastSentTime = now;
+                                } else {
+                                    // そうでなければ少し待って送信を予約
+                                    sendTimeoutId = setTimeout(() => {
+                                        if (newValue !== lastSentValue) {
+                                            sendCCUpdate(track, cc, newValue);
+                                            lastSentValue = newValue;
+                                        }
+                                    }, throttleDelay);
+                                }
+                            });
+
+                            // マウスアップ (ドラッグ終了)
+                            document.addEventListener('mouseup', () => {
+                                if (!isDragging) return;
+
+                                isDragging = false;
+                                knob.style.cursor = 'pointer';
+
+                                // 最終値を送信
+                                const finalValue = parseInt(valueDisplay.textContent);
+                                if (finalValue !== lastSentValue) {
+                                    sendCCUpdate(track, cc, finalValue);
+                                }
+                            });
+
+                            // タッチデバイス対応
+                            knob.addEventListener('touchstart', (e) => {
+                                isDragging = true;
+                                startY = e.touches[0].clientY;
+                                startValue = parseInt(valueDisplay.textContent);
+                                e.preventDefault();
+                            });
+
+                            document.addEventListener('touchmove', (e) => {
+                                if (!isDragging) return;
+
+                                const deltaY = startY - e.touches[0].clientY;
+                                let newValue = Math.max(0, Math.min(127, startValue + Math.round(deltaY / 2)));
+
+                                valueDisplay.textContent = newValue;
+
+                                const rotation = (newValue / 127) * 270 - 135;
+                                knob.style.transform = `rotate(${rotation}deg)`;
+
+                                currentState.cc_values[track][cc] = newValue;
+
+                                // 値の送信はマウスイベントと同じロジック
+                                const now = Date.now();
+                                const valueChange = Math.abs(newValue - lastSentValue);
+
+                                if (sendTimeoutId) {
+                                    clearTimeout(sendTimeoutId);
+                                }
+
+                                if (now - lastSentTime > throttleDelay || valueChange > 5) {
+                                    sendCCUpdate(track, cc, newValue);
+                                    lastSentValue = newValue;
+                                    lastSentTime = now;
+                                } else {
+                                    sendTimeoutId = setTimeout(() => {
+                                        if (newValue !== lastSentValue) {
+                                            sendCCUpdate(track, cc, newValue);
+                                            lastSentValue = newValue;
+                                        }
+                                    }, throttleDelay);
+                                }
+
+                                e.preventDefault();
+                            });
+
+                            document.addEventListener('touchend', (e) => {
+                                if (!isDragging) return;
+
+                                isDragging = false;
+
+                                const finalValue = parseInt(valueDisplay.textContent);
+                                if (finalValue !== lastSentValue) {
+                                    sendCCUpdate(track, cc, finalValue);
+                                }
+                            });
+
+                            // 要素を追加
+                            knobContainer.appendChild(knob);
+                            knobContainer.appendChild(valueDisplay);
+
+                            controlContainer.appendChild(label);
+                            controlContainer.appendChild(knobContainer);
+                        }
+
+                        trackDiv.appendChild(controlContainer);
+                    }
+
+                    ccControls.appendChild(trackDiv);
+                }
+            }
+        }
+
+        // CC更新を送信する関数
+        function sendCCUpdate(track, cc, value) {
+            console.log(`リアルタイムCC送信: ${track} ${cc} = ${value}`);
+
+            // ローカル操作フラグをセット
+            isLocallyControlling.cc = true;
+
+            sendMessage({
+                command: 'update_cc',
+                track: track,
+                cc: cc,
+                value: value
+            });
+
+            // 一定時間後にローカル操作フラグをリセット
+            setTimeout(() => {
+                isLocallyControlling.cc = false;
+            }, 500); // 500ms後にリセット
+        }
+
+        // WebSocket接続の確立
+        function connectWebSocket() {
+            if (isConnecting) {
+                console.log('接続試行中です。再試行を待機しています...');
+                return;
+            }
+
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                console.log('既に接続されています');
+                return;
+            }
+
+            if (socket && (socket.readyState === WebSocket.CONNECTING || socket.readyState === WebSocket.CLOSING)) {
+                console.log('WebSocketは現在接続中または切断中です。待機してください...');
+                return;
+            }
+
+            isConnecting = true;
+            connectionStatus.textContent = '接続試行中...';
+            connectionStatus.classList.remove('connected');
+            connectionStatus.classList.add('disconnected');
+
+            console.log(`WebSocketに接続を試みます: ${wsUrl} (試行 ${connectionAttempts + 1}/${maxConnectionAttempts})`);
+            statusElement.textContent = `ステータス: 接続を試みています... (${connectionAttempts + 1}/${maxConnectionAttempts})`;
+
+            try {
+                socket = new WebSocket(wsUrl);
+
+                socket.onopen = () => {
+                    console.log('WebSocket接続成功');
+                    connectionStatus.textContent = '接続済み';
+                    connectionStatus.classList.remove('disconnected');
+                    connectionStatus.classList.add('connected');
+                    isConnecting = false;
+                    connectionAttempts = 0;
+
+                    // 接続が確立されたらシーケンサーの状態を要求し、クライアントIDを送信
+                    statusElement.textContent = 'ステータス: 接続成功 - 状態を取得しています...';
+                    sendMessage({
+                        command: 'get_state',
+                        client_id: clientId
+                    });
+
+                    // 自動再接続を停止
+                    if (reconnectInterval) {
+                        clearInterval(reconnectInterval);
+                        reconnectInterval = null;
+                    }
+                };
+
+                socket.onclose = (event) => {
+                    console.log('WebSocket接続が閉じられました', event.code, event.reason);
+                    connectionStatus.textContent = '切断';
+                    connectionStatus.classList.remove('connected');
+                    connectionStatus.classList.add('disconnected');
+                    statusElement.textContent = `ステータス: 切断されました (コード: ${event.code})`;
+                    isConnecting = false;
+
+                    // 予期しない切断の場合は再接続を試行
+                    if (event.code !== 1000 || event.reason !== 'Normal Closure') {
+                        retryConnection();
+                    }
+                };
+
+                socket.onerror = (error) => {
+                    console.error('WebSocketエラー:', error);
+                    statusElement.textContent = 'ステータス: WebSocketエラーが発生しました';
+                    isConnecting = false;
+
+                    // エラーが発生した場合も再接続を試行
+                    retryConnection();
+                };
+
+                socket.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+
+                        // メッセージタイプに応じた処理
+                        if (data.type === 'state') {
+                            // シーケンサーの状態を更新
+                            currentState = {
+                                sequence: data.sequence || [],
+                                note_values: data.note_values || [],
+                                note_divides: data.note_divides || [],
+                                cc_values: data.cc_values || {},
+                                current_step: data.current_step || 0,
+                                is_playing: data.is_playing || false,
+                                bpm: data.bpm || 120
+                            };
+
+                            // 完全なUI再描画
+                            renderSequencerGrid();
+                            renderCCControls();
+                            updateStepIndicators(data.current_step);
+
+                            // 再生ボタンの状態を更新
+                            playButton.textContent = data.is_playing ? '停止' : '再生';
+
+                            // BPM入力フィールドを更新
+                            bpmInput.value = data.bpm;
+
+                            // MIDIポート情報を更新
+                            if (data.available_midi_outputs && data.available_midi_inputs) {
+                                updateMIDIPortLists(
+                                    data.available_midi_outputs,
+                                    data.available_midi_inputs,
+                                    data.midi_output,
+                                    data.midi_input,
+                                    data.midi_clock_enabled
+                                );
+                            }
+
+                            statusElement.textContent = '状態: 全データ更新完了';
+                        } else if (data.type === 'state_update') {
+                            // 軽量状態更新 - 必要最小限のUI更新のみ実行
+                            if (data.current_step !== undefined) {
+                                currentState.current_step = data.current_step;
+                                // ステップインジケーターだけを更新
+                                updateStepIndicators(data.current_step);
+                            }
+
+                            if (data.is_playing !== undefined && data.is_playing !== currentState.is_playing) {
+                                currentState.is_playing = data.is_playing;
+                                // 再生ボタンの状態を更新
+                                playButton.textContent = data.is_playing ? '停止' : '再生';
+                            }
+
+                            if (data.bpm !== undefined && data.bpm !== currentState.bpm) {
+                                currentState.bpm = data.bpm;
+                                // BPM入力フィールドを更新
+                                bpmInput.value = data.bpm;
+                            }
+
+                        } else if (data.type === 'play_state') {
+                            // 再生状態の更新
+                            currentState.is_playing = data.is_playing;
+                            currentState.current_step = data.current_step;
+
+                            // ステップインジケーターを更新
+                            updateStepIndicators(data.current_step);
+
+                            // 再生ボタンの状態を更新
+                            playButton.textContent = data.is_playing ? '停止' : '再生';
+
+                            // ステータス表示を更新
+                            statusElement.textContent = `ステータス: ${data.is_playing ? '再生中' : '停止中'}`;
+                        } else if (data.type === 'current_state') {
+                            // 現在の状態のみ更新
+                            currentState = {
+                                sequence: data.sequence,
+                                note_values: data.note_values,
+                                note_divides: data.note_divides,
+                                cc_values: data.cc_values,
+                                current_step: data.current_step,
+                                is_playing: data.is_playing,
+                                bpm: data.bpm
+                            };
+
+                            // UI要素を更新
+                            renderSequencerGrid();
+                            renderCCControls();
+
+                            statusElement.textContent = 'ステータス: 現在の状態を更新しました';
+                        } else if (data.type === 'step_update') {
+                            // 自分自身が操作中の場合は更新をスキップ
+                            if (isLocallyControlling.step) {
+                                return;
+                            }
+
+                            // シーケンスの特定のステップを更新
+                            if (currentState.sequence && currentState.sequence[data.row]) {
+                                currentState.sequence[data.row][data.col] = data.state;
+
+                                // 該当するボタン要素だけを更新
+                                const button = document.querySelector(`.step-button[data-row="${data.row}"][data-col="${data.col}"]`);
+                                if (button) {
+                                    if (data.state) {
+                                        button.classList.add('active');
+                                    } else {
+                                        button.classList.remove('active');
+                                    }
+                                } else {
+                                    // ボタンが見つからない場合は全体再描画
+                                    renderSequencerGrid();
+                                }
+                            }
+                        } else if (data.type === 'note_update') {
+                            // 自分自身が操作中の場合は更新をスキップ
+                            if (isLocallyControlling.note) {
+                                return;
+                            }
+
+                            // ノート値を更新
+                            if (currentState.note_values && currentState.note_values[data.row]) {
+                                currentState.note_values[data.row][data.col] = data.note;
+
+                                // 該当するノートの表示だけを更新
+                                const button = document.querySelector(`.step-button[data-row="${data.row}"][data-col="${data.col}"]`);
+                                if (button) {
+                                    const noteName = getNoteName(data.note).split(' ')[0];
+                                    button.textContent = noteName;
+                                } else {
+                                    // ボタンが見つからない場合は全体再描画
+                                    renderSequencerGrid();
+                                }
+
+                                // ノブの値も更新
+                                const knob = document.querySelector(`.mini-knob[data-row="${data.row}"][data-col="${data.col}"]`);
+                                const valueDisplay = knob ? knob.nextElementSibling : null;
+                                if (knob && valueDisplay) {
+                                    const noteNumber = data.note;
+                                    const noteName = getNoteName(noteNumber).split(' ')[0];
+                                    valueDisplay.textContent = noteName;
+
+                                    // ノブの角度も更新
+                                    const normalizedValue = (noteNumber - 36) / 60;
+                                    const rotation = normalizedValue * 270 - 135;
+                                    knob.style.transform = `rotate(${rotation}deg)`;
+                                }
+                            }
+                        } else if (data.type === 'divide_update') {
+                            // 自分自身が操作中の場合は更新をスキップ
+                            if (isLocallyControlling.divide) {
+                                return;
+                            }
+
+                            // 分割設定を更新
+                            if (currentState.note_divides && currentState.note_divides[data.row]) {
+                                currentState.note_divides[data.row][data.col] = data.divide;
+
+                                // 該当するボタンの分割設定クラスを更新
+                                const button = document.querySelector(`.step-button[data-row="${data.row}"][data-col="${data.col}"]`);
+                                if (button) {
+                                    // すべての分割クラスを削除
+                                    button.classList.remove('divide-1', 'divide-2', 'divide-3');
+                                    // 新しい分割クラスを追加
+                                    button.classList.add(`divide-${data.divide}`);
+
+                                    // 分割ボタンの表示も更新
+                                    const divideButtons = button.querySelectorAll('.divide-button');
+                                    divideButtons.forEach(btn => {
+                                        btn.classList.remove('active');
+                                        if (parseInt(btn.dataset.divide) === data.divide) {
+                                            btn.classList.add('active');
+                                        }
+                                    });
+                                } else {
+                                    // ボタンが見つからない場合は全体再描画
+                                    renderSequencerGrid();
+                                }
+                            }
+                        } else if (data.type === 'cc_update') {
+                            // 自分自身が操作中の場合は更新をスキップ
+                            if (isLocallyControlling.cc) {
+                                return;
+                            }
+
+                            // CC値を更新
+                            if (currentState.cc_values && currentState.cc_values[data.track]) {
+                                currentState.cc_values[data.track][data.cc] = data.value;
+
+                                // CC値の表示だけを部分的に更新
+                                // :contains擬似セレクタを使わない方法で要素を検索
+                                const trackDivs = document.querySelectorAll('.cc-track');
+                                let trackDiv = null;
+
+                                // トラック名が一致する要素を探す
+                                for (const div of trackDivs) {
+                                    const header = div.querySelector('h3');
+                                    if (header && header.textContent === data.track) {
+                                        trackDiv = div;
+                                        break;
+                                    }
+                                }
+
+                                if (trackDiv) {
+                                    // CC名またはCC番号が一致するラベルを探す
+                                    const ccSliders = trackDiv.querySelectorAll('.cc-slider');
+                                    let ccControlContainer = null;
+
+                                    for (const slider of ccSliders) {
+                                        const label = slider.querySelector('label');
+                                        if (label && (label.textContent.includes(data.cc) ||
+                                                label.textContent.includes(getCCParameterName(data.track, data.cc)))) {
+                                            ccControlContainer = slider;
+                                            break;
+                                        }
+                                    }
+
+                                    if (ccControlContainer) {
+                                        const knob = ccControlContainer.querySelector('.knob');
+                                        const valueDisplay = ccControlContainer.querySelector('.knob-value');
+
+                                        if (knob && valueDisplay) {
+                                            // 値表示を更新
+                                            valueDisplay.textContent = data.value;
+
+                                            // ノブの回転を更新
+                                            const rotation = (data.value / 127) * 270 - 135;
+                                            knob.style.transform = `rotate(${rotation}deg)`;
+                                            return;
+                                        }
+                                    }
+                                }
+
+                                // 部分更新できなかった場合は全体再描画
+                                renderCCControls();
+                            }
+                        } else if (data.type === 'current_step') {
+                            // 現在のステップのみを更新
+                            const prevStep = currentState.current_step;
+                            currentState.current_step = data.step;
+
+                            // ステップインジケーターを更新
+                            const prevIndicator = document.getElementById(`step-${prevStep}`);
+                            const currentIndicator = document.getElementById(`step-${data.step}`);
+
+                            if (prevIndicator) {
+                                prevIndicator.classList.remove('current');
+                            }
+
+                            if (currentIndicator) {
+                                currentIndicator.classList.add('current');
+                            }
+
+                            // 即座に再描画
+                            updateStepIndicators(data.step);
+                        } else if (data.type === 'status') {
+                            // 状態の更新
+                            if (data.is_playing !== undefined) {
+                                currentState.is_playing = data.is_playing;
+                                playButton.textContent = data.is_playing ? '停止' : '再生';
+                            }
+
+                            if (data.bpm !== undefined) {
+                                currentState.bpm = data.bpm;
+                                bpmInput.value = data.bpm;
+                            }
+
+                            if (data.midi_ports) {
+                                updateMIDIPorts(data.midi_ports.output, data.midi_ports.input, data.midi_ports.clock_enabled);
+                            }
+                        } else if (data.type === 'ports') {
+                            // MIDIポート情報の更新
+                            console.log('MIDIポート情報を受信:', data);
+                            updateMIDIPortLists(
+                                data.output || [],
+                                data.input || [],
+                                currentState.midi_output,
+                                currentState.midi_input,
+                                currentState.midi_clock_enabled
+                            );
+                            statusElement.textContent = 'ステータス: MIDIポート情報を更新しました';
+                        } else if (data.type === 'error') {
+                            console.error('サーバーエラー:', data.message);
+                            statusElement.textContent = `エラー: ${data.message}`;
+                        }
+                    } catch (e) {
+                        console.error('メッセージ処理エラー:', e);
+                        statusElement.textContent = `エラー: メッセージの処理に失敗しました: ${e.message}`;
+                    }
+                };
+            } catch (e) {
+                console.error('WebSocket作成エラー:', e);
+                statusElement.textContent = `ステータス: WebSocket接続の作成に失敗しました: ${e.message}`;
+
+                // 自動再接続を開始
+                if (!reconnectInterval) {
+
+                    // 再接続試行回数を制限
+                    let reconnectAttempts = 0;
+                    const maxReconnectAttempts = 3;
+                    reconnectInterval = setInterval(() => {
+                        if (reconnectAttempts < maxReconnectAttempts) {
+                            reconnectAttempts++;
+                            console.log(`再接続を試みます (${reconnectAttempts}/${maxReconnectAttempts})...`);
+                            connectWebSocket();
+                        } else {
+                            console.log('最大再接続試行回数に達しました。手動での再接続が必要です。');
+                            clearInterval(reconnectInterval);
+                            reconnectInterval = null;
+
+                            // 手動再接続ボタンを追加
+                            const reconnectButton = document.createElement('button');
+                            reconnectButton.textContent = 'サーバーに再接続';
+                            reconnectButton.onclick = () => {
+                                reconnectAttempts = 0;
+                                connectWebSocket();
+                            };
+                            statusElement.appendChild(reconnectButton);
+                        }
+                    }, 3000);
+                }
+            }
+        }
+
+        // スロットリング用の変数
+        const messageQueue = {};
+        const messageTimeout = {};
+        const throttleTime = {
+            'set_note': 100, // ノート設定は100ms間隔
+            'set_cc': 100, // CC設定も100ms間隔
+            'default': 50 // デフォルトは50ms
+        };
+
+        // WebSocketメッセージ送信関数（スロットリング付き）
+        function sendMessage(message) {
+            if (!socket || socket.readyState !== WebSocket.OPEN) {
+                console.warn('WebSocketは開いていません。メッセージを送信できません:', message);
+                statusElement.textContent = 'ステータス: 接続されていません。再接続してください。';
+                connectionStatus.textContent = '切断';
+                connectionStatus.classList.remove('connected');
+                connectionStatus.classList.add('disconnected');
+
+                // 再接続を試行
+                if (!reconnectInterval) {
+                    connectionAttempts = 0;
+                    retryConnection();
+                }
+                return;
+            }
+
+            const command = message.command;
+
+            // コマンドタイプに応じて操作中フラグをセット
+            if (command === 'toggle_step') {
+                isLocallyControlling.step = true;
+            } else if (command === 'set_note') {
+                isLocallyControlling.note = true;
+                if (message.divide !== undefined) {
+                    isLocallyControlling.divide = true;
+                }
+            } else if (command === 'update_cc') {
+                isLocallyControlling.cc = true;
+            }
+
+            // キューキーの作成（コマンドタイプと対象の組み合わせ）
+            let queueKey = command;
+
+            // コマンドに応じてキーを特殊化（同じパラメータへの更新を特定）
+            if (command === 'set_note' && message.row !== undefined && message.col !== undefined) {
+                queueKey = `${command}_${message.row}_${message.col}`;
+            } else if (command === 'set_cc' && message.track !== undefined && message.cc !== undefined) {
+                queueKey = `${command}_${message.track}_${message.cc}`;
+            }
+
+            // 既存のタイムアウトをクリア
+            if (messageTimeout[queueKey]) {
+                clearTimeout(messageTimeout[queueKey]);
+            }
+
+            // キューに最新のメッセージを保存
+            messageQueue[queueKey] = message;
+
+            // コマンドタイプに応じたスロットリング時間
+            const delay = throttleTime[command] || throttleTime.default;
+
+            // 新しいタイムアウトをセット
+            messageTimeout[queueKey] = setTimeout(() => {
+                const msg = messageQueue[queueKey];
+                if (msg) {
+                    socket.send(JSON.stringify(msg));
+                    delete messageQueue[queueKey];
+                    delete messageTimeout[queueKey];
+
+                    // 一定時間後にローカル操作フラグをリセット
+                    setTimeout(() => {
+                        if (command === 'toggle_step') {
+                            isLocallyControlling.step = false;
+                        } else if (command === 'set_note') {
+                            isLocallyControlling.note = false;
+                            if (msg.divide !== undefined) {
+                                isLocallyControlling.divide = false;
+                            }
+                        } else if (command === 'update_cc') {
+                            isLocallyControlling.cc = false;
+                        }
+                    }, 500); // 500ms後にリセット
+                }
+            }, delay);
+        }
+
+        // 再接続処理
+        function retryConnection() {
+            if (connectionAttempts < maxConnectionAttempts) {
+                connectionAttempts++;
+
+                // 指数バックオフ（時間をかけて再試行間隔を長くする）
+                const backoffTime = Math.min(1000 * Math.pow(1.5, connectionAttempts - 1), 10000);
+
+                console.log(`${backoffTime}ms後に再接続を試みます (${connectionAttempts}/${maxConnectionAttempts})...`);
+                statusElement.textContent = `ステータス: ${backoffTime/1000}秒後に再接続します (${connectionAttempts}/${maxConnectionAttempts})`;
+
+                setTimeout(() => {
+                    if (!isConnecting) {
+                        connectWebSocket();
+                    }
+                }, backoffTime);
+            } else {
+                console.log('最大再接続試行回数に達しました。手動での再接続が必要です。');
+                statusElement.textContent = 'ステータス: 接続エラー - 再接続ボタンをクリックしてください';
+
+                // 手動再接続ボタンを追加
+                const reconnectButton = document.createElement('button');
+                reconnectButton.textContent = 'サーバーに再接続';
+                reconnectButton.style.marginLeft = '10px';
+                reconnectButton.onclick = () => {
+                    connectionAttempts = 0;
+                    // ボタンを削除して再接続
+                    reconnectButton.remove();
+                    connectWebSocket();
+                };
+
+                // 既存のボタンがあれば削除
+                const existingButton = statusElement.querySelector('button');
+                if (existingButton) {
+                    existingButton.remove();
+                }
+
+                statusElement.appendChild(reconnectButton);
+            }
+        }
+
+        // MIDIポートリストを更新する関数
+        function updateMIDIPortLists(outputPorts, inputPorts, selectedOutput, selectedInput, clockEnabled) {
+            // MIDIポートリストが存在する場合のみ処理する
+            if (!outputPorts || !inputPorts) {
+                console.warn('MIDIポートリスト情報がありません。サーバーにリクエストを送信します。');
+                // MIDIポート一覧をリクエスト
+                sendMessage({
+                    command: 'get_available_ports'
+                });
+                return;
+            }
+
+            console.log('MIDIポート更新:', {
+                outputPorts: outputPorts.length + '個 (' + outputPorts.join(', ') + ')',
+                inputPorts: inputPorts.length + '個 (' + inputPorts.join(', ') + ')',
+                selectedOutput,
+                selectedInput,
+                clockEnabled
+            });
+
+            try {
+                // 出力ポートの選択肢を更新
+                const outputSelect = document.getElementById('midi-output-select');
+                if (!outputSelect) {
+                    console.error('MIDI出力セレクト要素が見つかりません');
+                    return;
+                }
+                outputSelect.innerHTML = '';
+
+                outputPorts.forEach(port => {
+                    const option = document.createElement('option');
+                    option.value = port;
+                    option.textContent = port;
+                    if (port === selectedOutput) {
+                        option.selected = true;
+                    }
+                    outputSelect.appendChild(option);
+                });
+
+                // 入力ポートの選択肢を更新
+                const inputSelect = document.getElementById('midi-input-select');
+                if (!inputSelect) {
+                    console.error('MIDI入力セレクト要素が見つかりません');
+                    return;
+                }
+                inputSelect.innerHTML = '';
+
+                inputPorts.forEach(port => {
+                    const option = document.createElement('option');
+                    option.value = port;
+                    option.textContent = port;
+                    if (port === selectedInput) {
+                        option.selected = true;
+                    }
+                    inputSelect.appendChild(option);
+                });
+
+                // MIDI Clockの有効/無効状態を更新
+                const clockCheckbox = document.getElementById('midi-clock-checkbox');
+                if (clockCheckbox) {
+                    clockCheckbox.checked = clockEnabled;
+                } else {
+                    console.warn('MIDIクロックチェックボックスが見つかりません');
+                }
+
+                statusElement.textContent = `ステータス: MIDIポート情報を更新しました (出力${outputPorts.length}個、入力${inputPorts.length}個)`;
+            } catch (error) {
+                console.error('MIDIポートリスト更新エラー:', error);
+                statusElement.textContent = 'ステータス: MIDIポート情報の更新に失敗しました';
+            }
+        }
+
+        // 既存のupdateMIDIPorts関数を残しておく（下位互換性のため）
+        function updateMIDIPorts(selectedOutput, selectedInput, clockEnabled) {
+            // MIDI Clockの有効/無効状態のみ更新
+            const clockCheckbox = document.getElementById('midi-clock-checkbox');
+            clockCheckbox.checked = clockEnabled;
+        }
+
+        // イベントリスナー
+        playButton.addEventListener('click', () => {
+            sendMessage({
+                command: 'toggle_play'
+            });
+        });
+
+        // BPM変更
+        document.getElementById('bpm-input').addEventListener('change', (e) => {
+            const newBPM = parseInt(e.target.value);
+            if (newBPM >= 20 && newBPM <= 300) {
+                sendMessage({
+                    command: 'set_bpm',
+                    bpm: newBPM
+                });
+            }
+        });
+
+        // MIDI出力ポート変更
+        midiOutput.addEventListener('change', () => {
+            const selectedPort = midiOutput.value;
+            console.log(`MIDI出力ポートを選択: ${selectedPort}`);
+            sendMessage({
+                command: 'change_midi_output',
+                port: selectedPort
+            });
+            statusElement.textContent = `ステータス: MIDI出力を ${selectedPort} に設定中...`;
+        });
+
+        // MIDI入力ポート変更
+        midiInput.addEventListener('change', () => {
+            const selectedPort = midiInput.value;
+            console.log(`MIDI入力ポートを選択: ${selectedPort}`);
+            sendMessage({
+                command: 'change_midi_input',
+                port: selectedPort
+            });
+            statusElement.textContent = `ステータス: MIDI入力を ${selectedPort} に設定中...`;
+        });
+
+        // MIDIクロック設定変更
+        midiClock.addEventListener('change', () => {
+            const enabled = midiClock.checked;
+            console.log(`MIDIクロック送信: ${enabled ? '有効' : '無効'}`);
+            sendMessage({
+                command: 'toggle_midi_clock',
+                enabled: enabled
+            });
+            statusElement.textContent = `ステータス: MIDIクロック送信を ${enabled ? '有効' : '無効'} に設定しました`;
+        });
+
+        // バッチ更新サンプル関数
+        function sendBatchUpdate(type) {
+            let updates = [];
+
+            if (type === 'sequence_row') {
+                // 1行目のステップを全てアクティブにするサンプル
+                const states = Array(16).fill(true);
+                updates.push({
+                    type: 'sequence_row',
+                    row: 0,
+                    states: states
+                });
+
+            } else if (type === 'note_row') {
+                // 1行目の全ノートをC4 (60)にするサンプル
+                const notes = Array(16).fill(60);
+                updates.push({
+                    type: 'note_row',
+                    row: 0,
+                    notes: notes
+                });
+
+            } else if (type === 'sequence_all') {
+                // トラック1~4のステップをランダムに設定するサンプル（トラック5は除外）
+                const allStates = [];
+                for (let row = 0; row < currentState.sequence.length; row++) {
+                    const rowStates = [];
+
+                    // トラック5（インデックス4）ではなく、現在の値を維持
+                    if (row === 4) {
+                        // 現在の状態をそのままコピー
+                        for (let col = 0; col < 16; col++) {
+                            rowStates.push(currentState.sequence[row][col]);
+                        }
+                    } else {
+                        // トラック1~4はランダムに設定
+                        for (let col = 0; col < 16; col++) {
+                            rowStates.push(Math.random() > 0.5);
+                        }
+                    }
+                    allStates.push(rowStates);
+                }
+                updates.push({
+                    type: 'sequence_all',
+                    states: allStates
+                });
+
+            } else if (type === 'note_all') {
+                // トラック1~4のノートをランダムに設定するサンプル（トラック5は除外）
+                const allNotes = [];
+                for (let row = 0; row < currentState.note_values.length; row++) {
+                    const rowNotes = [];
+
+                    // トラック5（インデックス4）ではなく、現在の値を維持
+                    if (row === 4) {
+                        // 現在の状態をそのままコピー
+                        for (let col = 0; col < 16; col++) {
+                            rowNotes.push(currentState.note_values[row][col]);
+                        }
+                    } else {
+                        // トラック1~4はランダムに設定
+                        for (let col = 0; col < 16; col++) {
+                            // 36-96の範囲でランダムなノート値を生成
+                            rowNotes.push(Math.floor(Math.random() * 60) + 36);
+                        }
+                    }
+                    allNotes.push(rowNotes);
+                }
+                updates.push({
+                    type: 'note_all',
+                    notes: allNotes
+                });
+            }
+
+            sendMessage({
+                command: 'batch_update',
+                updates: updates
+            });
+
+            statusElement.textContent = `ステータス: バッチ更新を送信しました (${type})`;
+        }
+
+        // ステップインジケーターを更新する関数
+        function updateStepIndicators(currentStep) {
+            // console.log(`ステップインジケーター更新: ${currentStep}`); // コメントアウト
+
+            if (currentStep === undefined) {
+                console.warn('ステップインジケーター更新: currentStepが未定義です');
+                return;
+            }
+
+            try {
+                // すべてのステップインジケーターから現在のクラスを削除
+                const allIndicators = document.querySelectorAll('.step-indicator');
+                // console.log(`全インジケーター数: ${allIndicators.length}`); // コメントアウト
+
+                allIndicators.forEach(indicator => {
+                    indicator.classList.remove('current');
+                });
+
+                // データ属性を使って現在のステップを見つける
+                const currentIndicators = document.querySelectorAll(`.step-indicator[data-step="${currentStep}"]`);
+                if (currentIndicators.length > 0) {
+                    currentIndicators.forEach(indicator => {
+                        indicator.classList.add('current');
+                        // console.log(`インジケーター追加: step=${currentStep}`); // コメントアウト
+                    });
+                } else {
+                    // インデックスベースでの検索（バックアップ）
+                    for (let row = 0; row < 4; row++) {
+                        const selector = `.grid-row:nth-child(${row + 2}) .step-indicator:nth-child(${currentStep + 2})`;
+                        const indicator = document.querySelector(selector);
+                        if (indicator) {
+                            indicator.classList.add('current');
+                            // console.log(`インジケーター追加: row=${row}, step=${currentStep}`); // コメントアウト
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('ステップインジケーター更新エラー:', error);
+            }
+        }
+
+        // ノート設定を更新する関数
+        function updateNote(row, col, noteValue, divideValue) {
+            console.log(`ノート更新: row=${row}, col=${col}, note=${noteValue}, divide=${divideValue}`);
+
+            // ローカル操作フラグをセット
+            isLocallyControlling.note = true;
+            if (divideValue !== undefined) {
+                isLocallyControlling.divide = true;
+
+                // 分割設定の変更を送信
+                sendMessage({
+                    command: 'set_divide',
+                    row: row,
+                    col: col,
+                    divide: divideValue
+                });
+            }
+
+            sendMessage({
+                command: 'set_note',
+                row: row,
+                col: col,
+                note: noteValue,
+                divide: divideValue
+            });
+
+            // 即時UI更新
+            if (currentState.note_values && currentState.note_values[row]) {
+                currentState.note_values[row][col] = noteValue;
+            }
+
+            if (currentState.note_divides && currentState.note_divides[row]) {
+                currentState.note_divides[row][col] = divideValue;
+            }
+
+            // 表示を更新
+            renderSequencerGrid();
+
+            // 一定時間後にローカル操作フラグをリセット
+            setTimeout(() => {
+                isLocallyControlling.note = false;
+                if (divideValue !== undefined) {
+                    isLocallyControlling.divide = false;
+                }
+            }, 500); // 500ms後にリセット
+        }
+
+        // ステップのトグル（オン/オフ）を制御する関数
+        function toggleStep(row, col, state) {
+            if (row === undefined || col === undefined) {
+                console.error('toggleStep: パラメータが不足しています');
+                return;
+            }
+
+            // ローカル操作フラグをセット
+            isLocallyControlling.step = true;
+
+            // 現在のステップの状態を反転
+            const newState = state !== undefined ? state : !currentState.sequence[row][col];
+            sendMessage({
+                command: 'toggle_step',
+                row: row,
+                col: col,
+                state: newState
+            });
+
+            // UIを即座に更新
+            currentState.sequence[row][col] = newState;
+
+            // ボタン要素を検索
+            const button = document.querySelector(`.step-button[data-row="${row}"][data-col="${col}"]`);
+            if (button) {
+                if (newState) {
+                    button.classList.add('active');
+                } else {
+                    button.classList.remove('active');
+                }
+            }
+
+            // 一定時間後にローカル操作フラグをリセット
+            setTimeout(() => {
+                isLocallyControlling.step = false;
+            }, 500); // 500ms後にリセット
+        }
+
+        // ページロード時にWebSocket接続を開始
+        connectWebSocket();
+
+        function updateState(state) {
+            // シーケンスデータの更新
+            if (state.sequence) {
+                currentState.sequence = state.sequence;
+            }
+
+            // ノート値の更新
+            if (state.note_values) {
+                currentState.note_values = state.note_values;
+            }
+
+            // ノート分割設定の更新
+            if (state.note_divides) {
+                currentState.note_divides = state.note_divides;
+            }
+
+            // CC値の更新
+            if (state.cc_values) {
+                currentState.cc_values = state.cc_values;
+            }
+
+            // 現在のステップを更新
+            if (state.current_step !== undefined) {
+                currentState.current_step = state.current_step;
+                updateStepIndicators(state.current_step);
+            }
+
+            // 再生状態を更新
+            if (state.is_playing !== undefined) {
+                currentState.is_playing = state.is_playing;
+                playButton.textContent = state.is_playing ? '停止' : '再生';
+            }
+
+            // BPMを更新
+            if (state.bpm) {
+                currentState.bpm = state.bpm;
+                bpmInput.value = state.bpm;
+            }
+
+            // ノートごとのCC値を更新
+            if (state.note_cc_values) {
+                // 実装が必要
+            }
+
+            // 利用可能なMIDIポートを更新
+            if (state.available_midi_outputs && state.available_midi_inputs) {
+                updateMIDIPortLists(
+                    state.available_midi_outputs,
+                    state.available_midi_inputs,
+                    state.midi_output,
+                    state.midi_input,
+                    state.midi_clock_enabled
+                );
+            }
+
+            // シーケンサー表示を更新
+            renderSequencerGrid();
+
+            // CC値表示を更新
+            renderCCControls();
+        }
+
+        function createDivideButtons(stepIndex, rowIndex) {
+            const divideButtons = document.createElement('div');
+            divideButtons.className = 'divide-buttons';
+
+            // 3つの分割ボタンを作成 (1, 2, 3連符)
+            const values = [1, 2, 3];
+
+            for (let i = 0; i < values.length; i++) {
+                const button = document.createElement('div');
+                button.className = 'divide-button';
+                if (values[i] === 1) {
+                    button.classList.add('active'); // デフォルトは1連符
+                }
+                button.dataset.divide = values[i];
+                button.dataset.row = rowIndex;
+                button.dataset.step = stepIndex;
+
+                // 必要に応じてクラスを追加
+                if (values[i] === 2) {
+                    button.classList.add('divide-2');
+                } else if (values[i] === 3) {
+                    button.classList.add('divide-3');
+                }
+
+                button.addEventListener('click', function() {
+                    // 同じボタンがすでにアクティブか確認
+                    const isAlreadyActive = this.classList.contains('active');
+
+                    // 同じ行・ステップの他のボタンからactiveクラスを削除
+                    const siblings = divideButtons.querySelectorAll('.divide-button');
+                    siblings.forEach(sib => sib.classList.remove('active'));
+
+                    // 既にアクティブだった場合は、デフォルト（1連符）に戻す
+                    if (isAlreadyActive && values[i] !== 1) {
+                        divideButtons.querySelector('[data-divide="1"]').classList.add('active');
+                        sendNoteDivideUpdate(rowIndex, stepIndex, 1);
+                    } else {
+                        // このボタンをアクティブに
+                        this.classList.add('active');
+                        sendNoteDivideUpdate(rowIndex, stepIndex, values[i]);
+                    }
+                });
+
+                divideButtons.appendChild(button);
+            }
+
+            return divideButtons;
+        }
+
+        function initializeFromState(state) {
+            // ... existing code ...
+
+            // ノート分割設定を反映
+            if (state.note_divides) {
+                state.note_divides.forEach((row, rowIndex) => {
+                    row.forEach((divideValue, stepIndex) => {
+                        const gridItem = document.querySelector(`.grid-item[data-row="${rowIndex}"][data-step="${stepIndex}"]`);
+                        if (gridItem) {
+                            const divideButtons = gridItem.querySelector('.divide-buttons');
+                            if (divideButtons) {
+                                // すべてのボタンからactiveクラスを削除
+                                divideButtons.querySelectorAll('.divide-button').forEach(btn => {
+                                    btn.classList.remove('active');
+                                });
+
+                                // 現在の分割値に対応するボタンをアクティブに
+                                const targetButton = divideButtons.querySelector(`.divide-button[data-divide="${divideValue}"]`);
+                                if (targetButton) {
+                                    targetButton.classList.add('active');
+                                    if (divideValue === 2) {
+                                        targetButton.classList.add('divide-2');
+                                    } else if (divideValue === 3) {
+                                        targetButton.classList.add('divide-3');
+                                    }
+                                }
+                            }
+                        }
+                    });
+                });
+            }
+        }
+
+        function sendNoteDivideUpdate(row, step, divide) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                const message = {
+                    type: 'set_note_divide',
+                    row: row,
+                    step: step,
+                    divide: divide
+                };
+                ws.send(JSON.stringify(message));
+            }
+        }
+
+        // WebSocket接続後にMIDIポート情報を明示的にリクエスト
+        function requestMIDIPorts() {
+            sendMessage({
+                command: 'get_available_ports'
+            });
+        }
+
+        // 接続完了時のハンドラ内に追加
+        socket.onopen = () => {
+            connectionStatus.textContent = '接続';
+            connectionStatus.classList.remove('disconnected');
+            connectionStatus.classList.add('connected');
+            isConnecting = false;
+            connectionAttempts = 0;
+            console.log('WebSocket接続が確立されました');
+
+            // クライアントIDを送信
+            const clientId = generateClientId();
+            sendMessage({
+                command: 'register',
+                client_id: clientId
+            });
+
+            // 初期状態を要求
+            sendMessage({
+                command: 'get_state'
+            });
+
+            // MIDIポート情報を明示的にリクエスト
+            setTimeout(requestMIDIPorts, 500);
+
+            statusElement.textContent = 'ステータス: 接続しました。データ取得中...';
+        };
+    </script>
+</body>
+
+</html>

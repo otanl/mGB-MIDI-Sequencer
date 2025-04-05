@@ -1,0 +1,29 @@
+mGB MIDI Sequencer 使用方法
+=========================
+
+このアプリケーションは、GameBoy用MIDIインターフェース「mGB」と連携して使用するMIDIシーケンサーです。
+
+インストール方法:
+--------------
+1. Python 3.7以上がインストールされていることを確認してください
+2. コマンドプロンプト/ターミナルで以下のコマンドを実行して依存関係をインストールします：
+   pip install -r requirements.txt
+
+起動方法:
+-------
+Windows: 
+- run.batをダブルクリックするか、「python wrapper.py」を実行してください
+
+Mac/Linux: 
+- 「chmod +x run.sh」でrun.shに実行権限を与えた後、「./run.sh」で起動するか
+- 「python3 wrapper.py」を実行してください
+
+使用方法:
+-------
+1. アプリケーションを起動すると、Python GUIとWebブラウザの両方で操作できます
+2. WebインターフェースはHTTPサーバーとWebSocketサーバーを使用しています
+   (デフォルトでは、http://localhost:8000 と ws://localhost:8765)
+3. MIDI出力デバイスとして「mGB」または「Arduinoboy」があれば自動的に選択されます
+4. シーケンスパターンを作成し、再生ボタンを押すと音楽が再生されます
+
+詳細については、README.mdファイルを参照してください。 
