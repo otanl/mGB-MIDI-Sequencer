@@ -19,14 +19,25 @@ if not exist "venv" (
 REM 仮想環境を有効化して依存パッケージをインストール
 echo 必要なパッケージをインストールしています...
 call venv\Scripts\activate
-python -m pip install -r requirements.txt
+
+REM requirements.txtを一時的に作成してUTF-8で保存
+echo # MIDIシーケンサーの依存関係 > requirements_temp.txt
+echo mido^>=1.2.10 >> requirements_temp.txt
+echo python-rtmidi^>=1.4.9 >> requirements_temp.txt
+echo websockets^>=10.3 >> requirements_temp.txt
+
+python -m pip install -r requirements_temp.txt
 if errorlevel 1 (
     echo パッケージのインストールに失敗しました。
-    echo requirements.txtが正しいフォーマットであることを確認してください。
+    echo requirements.txtのフォーマットに問題がある可能性があります。
+    del requirements_temp.txt
     call venv\Scripts\deactivate.bat
     pause
     exit /b
 )
+
+REM 一時ファイルを削除
+del requirements_temp.txt
 
 echo mGB MIDI Sequencer を起動中...
 python wrapper.py
