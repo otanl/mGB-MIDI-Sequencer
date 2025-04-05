@@ -699,7 +699,13 @@
 
     <script>
         // WebSocket接続
-        const wsUrl = 'ws://192.168.2.101:8765';
+        // URLパラメータからWebSocketのURLを取得
+        function getWebSocketURLFromParams() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('wsurl') || 'ws://localhost:8765';
+        }
+
+        const wsUrl = getWebSocketURLFromParams();
         let socket;
         let reconnectInterval = null;
         let modalData = {
